@@ -43,9 +43,7 @@ bin\qcmd.conf`）
 - 添加或更新映射（命令可包含空格）：
 
 ```powershell
-& ".\\bin\\qcmd.exe" add build-mesen=dotnet publish -c Release -r win-x64 -p:PublishAot=true -p:PublishSingleFile=false -p:SelfContained=true
-# 若要避免 PowerShell 的参数拆分，也可以将整个参数用引号包起来：
-& ".\\bin\\qcmd.exe" 'add build-mesen=dotnet publish -c Release -r win-x64'
+& ".\\bin\\qcmd.exe" add build=dotnet publish -c Release -r win-x64
 ```
 
 - 执行映射：
@@ -86,5 +84,5 @@ msbuild "D:\\GitCode\\QuickCmd(Github)\\QuickCmd.sln" /p:Configuration=Release /
 有关许可信息，请参阅仓库根目录的 `LICENSE` 文件。
 
 ---
-作者/维护：仓库维护者（见仓库信息）
+作者/维护：Lion
 
