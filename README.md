@@ -49,14 +49,40 @@ bin\qcmd.conf`）
 - 执行映射：
 
 ```powershell
-& ".\\bin\\qcmd.exe" build-mesen
+& ".\\bin\\qcmd.exe" build
 ```
 
 - 删除映射：
 
 ```powershell
-& ".\\bin\\qcmd.exe" remove build-mesen
+& ".\\bin\\qcmd.exe" remove build
 ```
+
+## 将 qcmd.exe 加入系统环境变量（PATH）（可选）
+
+如果希望在任意目录直接使用 `qcmd` 命令，可以将 `qcmd.exe` 所在的 `bin` 目录加入用户或系统的 PATH 环境变量。下面给出两种常见方法（PowerShell 命令行与 Windows GUI）。
+
+- 临时（仅在当前 PowerShell 会话有效）：
+
+```powershell
+# 示例：假设 qcmd 位于 D:\GitCode\QuickCmd(Github)\bin，将其追加到当前会话的 PATH：
+$env:PATH += ';D:\GitCode\QuickCmd(Github)\bin'
+# 之后立即可使用 qcmd（仅本次会话有效）：
+qcmd list
+```
+
+- 永久（用户级 PATH，需在新会话中生效）：
+
+```powershell
+# 请替换为你的实际路径（不要在末尾加分号）。setx 会修改当前用户的 PATH 注册表项： 
+setx PATH "$env:PATH;D:\\GitCode\\QuickCmd(Github)\\bin"
+# 完成后关闭并重新打开终端，然后可直接使用 qcmd，例如：qcmd --help
+```
+
+注意：
+- 修改系统级 PATH（对所有用户生效）需要管理员权限；也可通过 GUI 修改：系统属性 -> 高级 -> 环境变量 -> PATH -> 编辑 -> 新建，然后添加 qcmd 所在目录。
+- 使用 `setx` 时，Windows 可能对环境变量长度有限制，请谨慎追加并在必要时备份 PATH。
+- 新增到 PATH 后，必须重新打开命令行窗口以使更改生效。
 
 ## 从源码构建
 
