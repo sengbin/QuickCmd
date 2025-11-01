@@ -21,7 +21,7 @@ bin\qcmd.conf`）
 
 ```text
 # qcmd.conf 示例（默认被注释以防误执行）
-# build-mesen=dotnet publish -c Release -r win-x64 -p:PublishAot=true -p:PublishSingleFile=false -p:SelfContained=true
+# build=dotnet publish -c Release -r win-x64
 ```
 
 程序读取配置后会将键值对装载为映射（name -> command），并在执行 `qcmd <name>` 时调用系统 shell 执行对应命令。
@@ -31,31 +31,31 @@ bin\qcmd.conf`）
 - 显示帮助（无参数也显示帮助）：
 
 ```powershell
-& ".\\bin\\qcmd.exe"
+".\\bin\\qcmd.exe"
 ```
 
 - 列出映射：
 
 ```powershell
-& ".\\bin\\qcmd.exe" list
+".\\bin\\qcmd.exe" list
 ```
 
 - 添加或更新映射（命令可包含空格）：
 
 ```powershell
-& ".\\bin\\qcmd.exe" add build=dotnet publish -c Release -r win-x64
+".\\bin\\qcmd.exe" add build=dotnet publish -c Release -r win-x64
 ```
 
 - 执行映射：
 
 ```powershell
-& ".\\bin\\qcmd.exe" build
+".\\bin\\qcmd.exe" build
 ```
 
 - 删除映射：
 
 ```powershell
-& ".\\bin\\qcmd.exe" remove build
+".\\bin\\qcmd.exe" remove build
 ```
 
 ## 将 qcmd.exe 加入系统环境变量（PATH）（可选）
@@ -111,4 +111,3 @@ msbuild "D:\\GitCode\\QuickCmd(Github)\\QuickCmd.sln" /p:Configuration=Release /
 
 ---
 作者/维护：Lion
-
