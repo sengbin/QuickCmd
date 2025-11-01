@@ -107,11 +107,160 @@ static bool createDefaultConfig(const std::filesystem::path &path)
     return true;
 }
 
+/**
+ * @brief 将映射写入配置文件（覆盖写入），保留头部注释
+ * @param path 配置文件路径
+ * @param mappings 要写入的键值映射
+ * @return 写入成功返回 true，否则返回 false
+ */
+static bool writeConfig(const std::filesystem::path &path, const map<string, string> &mappings)
+{
+    std::ofstream ofs(path, std::ios::out | std::ios::trunc);
+    if (!ofs.is_open()) return false;
+    ofs << "# qcmd 配置文件\n";
+    ofs << "# 格式： name=command\n";
+    ofs << "# 注：以 '#' 或 ';' 开头的行为注释，会被忽略。\n";
+    ofs << "# 说明：在命令行中运行 qcmd <name> 会执行对应的 command。\n";
+    ofs << "# 以下为用户映射（自动生成/更新）：\n";
+    for (const auto &kv : mappings) {
+        ofs << kv.first << "=" << kv.second << "\n";
+    }
+    ofs.close();
+    return true;
+}
+
+/**
+ * @brief 在配置文件中添加或覆盖映射
+ * @param path 配置文件路径
+ * @param name 映射名
+ * @param command 命令字符串
+ * @return 成功返回 true，失败返回 false
+ */
+static bool addOrUpdateMapping(const std::filesystem::path &path, const string &name, const string &command)
+{
+    map<string, string> m = loadConfig(path);
+    m[name] = command;
+    return writeConfig(path, m);
+}
+
+/**
+ * @brief 从配置文件中删除映射（若存在）
+ * @param path 配置文件路径
+ * @param name 要删除的映射名
+ * @return 若存在并删除返回 true；若不存在返回 false；写入失败返回 false
+ */
+static bool removeMappingFile(const std::filesystem::path &path, const string &name)
+{
+    map<string, string> m = loadConfig(path);
+    auto it = m.find(name);
+    if (it == m.end()) return false;
+    m.erase(it);
+    return writeConfig(path, m);
+}
+
+/**
+ * @brief 打印程序帮助信息
+ */
+static void printHelp()
+{
+    std::cout << "使用说明：" << std::endl;
+    std::cout << "  qcmd list            列出所有命令映射" << std::endl;
+    std::cout << "  qcmd <name>          执行映射为 <name> 的命令" << std::endl;
+    std::cout << "  qcmd add name=cmd    添加或更新映射（命令可包含空格），示例：qcmd add build=dotnet publish -c Release" << std::endl;
+    std::cout << "  qcmd remove name     删除映射（别名：rm/del）" << std::endl;
+    std::cout << "  qcmd --help|-h|help  显示本帮助（无参数也显示帮助）" << std::endl;
+}
+
 int main(int argc, char **argv)
 {
     // 获取程序所在目录并定位配置文件 qcmd.conf
     std::filesystem::path exeDir = getExecutableDir(argv && argv[0] ? argv[0] : nullptr);
     std::filesystem::path cfgPath = exeDir / "qcmd.conf";
+
+    // 支持帮助参数：-h, --help, help
+    if (argc > 1) {
+        string h = argv[1];
+        if (h == "-h" || h == "--help" || h == "help") {
+            printHelp();
+            return 0;
+        }
+    }
+
+    // 处理子命令：add / remove（在尝试自动生成配置前处理）
+    if (argc > 1) {
+        string sub = argv[1];
+        if (sub == "list" || sub == "ls") {
+            if (!std::filesystem::exists(cfgPath)) {
+                bool ok = createDefaultConfig(cfgPath);
+                if (ok) {
+                    std::cout << "未找到配置文件，已在程序目录生成配置：" << cfgPath.string() << std::endl;
+                } else {
+                    std::cerr << "未找到配置文件，尝试生成配置失败：" << cfgPath.string() << std::endl;
+                }
+            }
+            map<string, string> mappings = loadConfig(cfgPath);
+            if (mappings.empty()) {
+                std::cout << "配置文件为空或未包含任何映射（文件位置：" << cfgPath.string() << "）。" << std::endl;
+                return 0;
+            }
+            std::cout << "命令映射列表：" << std::endl;
+            const string color_start = "\x1b[32m"; // 绿色
+            const string color_end = "\x1b[0m";    // 重置颜色
+            for (const auto &kv : mappings) {
+                std::cout << color_start << kv.first << color_end << " " << kv.second << std::endl;
+            }
+            return 0;
+        }
+        if (sub == "add") {
+            if (argc < 3) {
+                std::cerr << "用法: qcmd add name=command" << std::endl;
+                return 1;
+            }
+            // 将 argv[2..] 拼接为一个 mapping 字符串，支持命令中包含空格
+            std::ostringstream oss;
+            for (int i = 2; i < argc; ++i) {
+                if (i > 2) oss << ' ';
+                oss << argv[i];
+            }
+            string mappingArg = trim(oss.str());
+            size_t eq = mappingArg.find('=');
+            if (eq == string::npos) {
+                std::cerr << "add 参数格式错误，示例: qcmd add build=dotnet publish ..." << std::endl;
+                return 1;
+            }
+            string key = trim(mappingArg.substr(0, eq));
+            string val = trim(mappingArg.substr(eq + 1));
+            if (key.empty()) {
+                std::cerr << "add 参数错误：名称不能为空" << std::endl;
+                return 1;
+            }
+            bool ok = addOrUpdateMapping(cfgPath, key, val);
+            if (!ok) {
+                std::cerr << "写入配置失败：" << cfgPath.string() << std::endl;
+                return 1;
+            }
+            std::cout << "已添加/更新映射：" << key << " -> " << val << std::endl;
+            return 0;
+        }
+        if (sub == "remove" || sub == "rm" || sub == "del") {
+            if (argc < 3) {
+                std::cerr << "用法: qcmd remove name" << std::endl;
+                return 1;
+            }
+            string key = trim(string(argv[2]));
+            if (key.empty()) {
+                std::cerr << "remove 参数错误：名称不能为空" << std::endl;
+                return 1;
+            }
+            bool removed = removeMappingFile(cfgPath, key);
+            if (!removed) {
+                std::cerr << "未找到命令映射：" << key << std::endl;
+                return 2;
+            }
+            std::cout << "已删除映射：" << key << std::endl;
+            return 0;
+        }
+    }
 
     // 若配置文件不存在，则自动生成一个示例配置
     if (!std::filesystem::exists(cfgPath)) {
@@ -127,21 +276,9 @@ int main(int argc, char **argv)
     // 加载配置映射
     map<string, string> mappings = loadConfig(cfgPath);
 
-    // 无参数：列出所有映射
+    // 无参数：显示帮助（使用 list 参数列出映射）
     if (argc <= 1) {
-        if (mappings.empty()) {
-            std::cout << "配置文件为空或未包含任何映射（文件位置：" << cfgPath.string() << "）。" << std::endl;
-            return 0;
-        }
-        std::cout << "命令映射列表：" << std::endl;
-        // 使用 ANSI 控制序列为左侧名称上色（绿色），然后以空格分隔展示命令
-        const string color_start = "\x1b[32m"; // 绿色
-        const string color_end = "\x1b[0m";    // 重置颜色
-        for (const auto &kv : mappings) {
-            const string &key = kv.first;
-            const string &val = kv.second;
-            std::cout << color_start << key << color_end << " " << val << std::endl;
-        }
+        printHelp();
         return 0;
     }
 
